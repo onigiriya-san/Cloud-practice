@@ -50,7 +50,21 @@ class PriceSignals(unittest.TestCase):
             return make(code, c, [100.0] * 60 + [400.0] * 5)
         res = market_crash(cat(stock("A0001"), stock("B0001")))
         self.assertTrue(res["alert"])
+        self.assertEqual(res["level"], "crash")
         self.assertLess(res["cum_return"], -0.10)
+
+    def test_warning_without_volume(self):
+        def stock(code):
+            c = [100.0] * 60 + [99.0, 98.0, 97.0, 96.0, 95.0]
+            return make(code, c, [100.0] * 65)
+        res = market_crash(cat(stock("A0001"), stock("B0001")))
+        self.assertEqual(res["level"], "warning")
+
+    def test_drop_beyond_crash_without_volume_is_warning(self):
+        def stock(code):
+            c = [100.0] * 60 + [97.0, 94.0, 91.0, 88.0, 85.0]
+            return make(code, c, [100.0] * 65)
+        self.assertEqual(market_crash(cat(stock("A0001")))["level"], "warning")
 
     def test_calm_market_no_alert(self):
         df = cat(make("A0001", [100.0] * 70, [100.0] * 70))

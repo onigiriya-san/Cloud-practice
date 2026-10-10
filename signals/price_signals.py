@@ -71,14 +71,25 @@ def market_index(df) -> pd.DataFrame:
     return pd.DataFrame({"ret": idx, "Va": va}).dropna().sort_index()
 
 
-def market_crash(df, days=5, drop=-0.10, va_window=60, va_mult=2.0) -> dict:
-    """S4: 最終日時点の相場急落判定。売りシグナルではなく買い場アラート。"""
+def market_crash(df, days=5, drop=-0.10, warn_drop=-0.05, va_window=60, va_mult=1.3) -> dict:
+    """S4: 最終日時点の相場急落判定。売りシグナルではなく買い場アラート。
+
+    level: "crash"   = days日累計が drop 以下 かつ 売買代金が平均の va_mult 倍以上
+           "warning" = days日累計が warn_drop 以下 (売買代金は問わない)
+           None      = どちらでもない
+    """
     m = market_index(df)
     if len(m) < days:
-        return {"alert": False, "reason": "insufficient_history"}
+        return {"alert": False, "level": None, "reason": "insufficient_history"}
     cum = (1 + m.ret.tail(days)).prod() - 1
     base = m.Va.shift(1).rolling(va_window, min_periods=1).mean().iloc[-1]
     va_ratio = m.Va.iloc[-1] / base if base == base and base > 0 else float("nan")
-    return {"alert": bool(cum <= drop and va_ratio >= va_mult),
+    if cum <= drop and va_ratio >= va_mult:
+        level = "crash"
+    elif cum <= warn_drop:
+        level = "warning"
+    else:
+        level = None
+    return {"alert": level is not None, "level": level,
             "cum_return": float(cum), "va_ratio": float(va_ratio),
             "date": m.index[-1]}
